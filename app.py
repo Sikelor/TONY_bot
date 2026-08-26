@@ -42,9 +42,9 @@ def rispondi(messaggio, cronologia):
             )
         )
 
-        # Chiamata API al modello Gemini 2.5 Flash
+        # Chiamata API al modello Gemini 3.6 Flash
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.6-flash",
             contents=contents,
             config=types.GenerateContentConfig(
                 system_instruction="Sei TONY, un assistente IA amichevole, brillante e utile."
