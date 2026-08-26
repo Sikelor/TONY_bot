@@ -11,7 +11,7 @@ def rispondi(messaggio, cronologia):
     if cronologia is None:
         cronologia = []
 
-    # Formattta lo storico della chat per Gemini
+    # Formatta lo storico della chat per Gemini
     contents = []
     for user_msg, bot_msg in cronologia:
         contents.append(
@@ -31,7 +31,7 @@ def rispondi(messaggio, cronologia):
         )
     )
 
-    # Genera la risposta col modello Gemini 2.5 Flash
+    # Genera la risposta col modello Gemini 3.6 Flash
     response = client.models.generate_content(
         model="gemini-3.6-flash",
         contents=contents,
@@ -49,7 +49,14 @@ def rispondi(messaggio, cronologia):
 # Interfaccia Gradio multi-utente con memoria isolata
 with gr.Blocks(theme=gr.themes.Soft()) as demo:
     gr.Markdown("<center><h1>TONY - Assistente Virtuale</h1></center>")
-    gr.Markdown("<center><h3>Anche se non sono intelligente come Lorenzo, proverò ad aiutarti!</h3></center>")
+    gr.Markdown(
+        "<center><h3>Anche se non sono intelligente come Lorenzo, proverò ad"
+        " aiutarti!</h3></center>"
+    )
+
+    # Elemento visivo della chat (indispensabile prima dei comandi sottostanti)
+    chatbot = gr.Chatbot(height=450)
+
     msg = gr.Textbox(placeholder="Scrivi un messaggio a TONY...")
     clear = gr.Button("Cancella Chat")
 
