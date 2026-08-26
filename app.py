@@ -3,48 +3,62 @@ import gradio as gr
 from google import genai
 from google.genai import types
 
-# Inizializza il client prendendo la chiave API dalle variabili d'ambiente
-client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+# Recupera la chiave API da Render
+api_key = os.environ.get("GEMINI_API_KEY")
 
 
 def rispondi(messaggio, cronologia):
     if cronologia is None:
         cronologia = []
 
-    # Costruisce lo storico per Gemini usando il formato tupla (user, bot)
-    contents = []
-    for user_msg, bot_msg in cronologia:
+    if not api_key:
+        cronologia.append((
+            messaggio,
+            "ERRORE: La chiave GEMINI_API_KEY non è impostata nelle variabili"
+            " d'ambiente di Render!",
+        ))
+        return "", cronologia
+
+    try:
+        # Inizializza il client Google GenAI
+        client = genai.Client(api_key=api_key)
+
+        # Prepara lo storico
+        contents = []
+        for user_msg, bot_msg in cronologia:
+            contents.append(
+                types.Content(
+                    role="user", parts=[types.Part.from_text(text=str(user_msg))]
+                )
+            )
+            contents.append(
+                types.Content(
+                    role="model",
+                    parts=[types.Part.from_text(text=str(bot_msg))],
+                )
+            )
+
         contents.append(
             types.Content(
-                role="user", parts=[types.Part.from_text(text=str(user_msg))]
-            )
-        )
-        contents.append(
-            types.Content(
-                role="model", parts=[types.Part.from_text(text=str(bot_msg))]
+                role="user", parts=[types.Part.from_text(text=messaggio)]
             )
         )
 
-    # Aggiunge il messaggio corrente dell'utente
-    contents.append(
-        types.Content(
-            role="user", parts=[types.Part.from_text(text=messaggio)]
+        # Chiamata API al modello gemini-2.5-flash
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=contents,
+            config=types.GenerateContentConfig(
+                system_instruction="Sei TONY, un assistente IA amichevole, brillante e utile."
+            ),
         )
-    )
 
-    # Chiamata al modello Gemini 2.5 Flash
-    response = client.models.generate_content(
-        model="gemini-3.6-flash",
-        contents=contents,
-        config=types.GenerateContentConfig(
-            system_instruction="Sei TONY, un assistente IA amichevole, brillante e utile."
-        ),
-    )
+        testo_risposta = response.text
+        cronologia.append((messaggio, testo_risposta))
 
-    testo_risposta = response.text
-
-    # Aggiorna la cronologia aggiungendo la nuova tupla (messaggio, risposta)
-    cronologia.append((messaggio, testo_risposta))
+    except Exception as e:
+        # Mostra l'errore esatto dentro la chat anziché far crashare l'interfaccia
+        cronologia.append((messaggio, f"ERRORE API: {str(e)}"))
 
     return "", cronologia
 
@@ -53,7 +67,6 @@ def svuota_chat():
     return [], []
 
 
-# Interfaccia Gradio
 with gr.Blocks(theme=gr.themes.Soft()) as demo:
     gr.Markdown("<center><h1>TONY - Assistente Virtuale</h1></center>")
     gr.Markdown(
@@ -67,7 +80,6 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
 
     stato_chat = gr.State([])
 
-    # Collegamento corretto degli eventi con lo stato isolato
     msg.submit(rispondi, [msg, stato_chat], [msg, chatbot])
     clear.click(svuota_chat, inputs=None, outputs=[chatbot, stato_chat])
 
