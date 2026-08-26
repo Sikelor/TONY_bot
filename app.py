@@ -12,39 +12,37 @@ def rispondi(messaggio, cronologia):
         cronologia = []
 
     if not api_key:
-        cronologia.append((
-            messaggio,
-            "ERRORE: La chiave GEMINI_API_KEY non è impostata nelle variabili"
-            " d'ambiente di Render!",
-        ))
+        cronologia.append({"role": "user", "content": messaggio})
+        cronologia.append({
+            "role": "assistant",
+            "content": (
+                "ERRORE: La chiave GEMINI_API_KEY non è impostata nelle"
+                " variabili d'ambiente di Render!"
+            ),
+        })
         return "", cronologia
 
     try:
-        # Inizializza il client Google GenAI
         client = genai.Client(api_key=api_key)
 
-        # Prepara lo storico
+        # Formatta lo storico dei messaggi nel formato richiesto da Gemini
         contents = []
-        for user_msg, bot_msg in cronologia:
+        for msg in cronologia:
+            role = "user" if msg["role"] == "user" else "model"
             contents.append(
                 types.Content(
-                    role="user", parts=[types.Part.from_text(text=str(user_msg))]
-                )
-            )
-            contents.append(
-                types.Content(
-                    role="model",
-                    parts=[types.Part.from_text(text=str(bot_msg))],
+                    role=role, parts=[types.Part.from_text(text=msg["content"])]
                 )
             )
 
+        # Aggiunge il messaggio corrente
         contents.append(
             types.Content(
                 role="user", parts=[types.Part.from_text(text=messaggio)]
             )
         )
 
-        # Chiamata API al modello gemini-2.5-flash
+        # Chiamata API al modello Gemini 2.5 Flash
         response = client.models.generate_content(
             model="gemini-2.5-flash",
             contents=contents,
@@ -54,17 +52,20 @@ def rispondi(messaggio, cronologia):
         )
 
         testo_risposta = response.text
-        cronologia.append((messaggio, testo_risposta))
+
+        # Aggiorna lo storico nel formato Dizionario richiesto da questa versione di Gradio
+        cronologia.append({"role": "user", "content": messaggio})
+        cronologia.append({"role": "assistant", "content": testo_risposta})
 
     except Exception as e:
-        # Mostra l'errore esatto dentro la chat anziché far crashare l'interfaccia
-        cronologia.append((messaggio, f"ERRORE API: {str(e)}"))
+        cronologia.append({"role": "user", "content": messaggio})
+        cronologia.append({"role": "assistant", "content": f"ERRORE API: {str(e)}"})
 
     return "", cronologia
 
 
 def svuota_chat():
-    return [], []
+    return []
 
 
 with gr.Blocks(theme=gr.themes.Soft()) as demo:
@@ -78,10 +79,9 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
     msg = gr.Textbox(placeholder="Scrivi un messaggio a TONY...")
     clear = gr.Button("Cancella Chat")
 
-    stato_chat = gr.State([])
-
-    msg.submit(rispondi, [msg, stato_chat], [msg, chatbot])
-    clear.click(svuota_chat, inputs=None, outputs=[chatbot, stato_chat])
+    # Passiamo chatbot sia come input che come output per sincronizzare lo stato dei dizionari
+    msg.submit(rispondi, [msg, chatbot], [msg, chatbot])
+    clear.click(svuota_chat, inputs=None, outputs=[chatbot])
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 7860))
