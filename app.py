@@ -3,7 +3,7 @@ import gradio as gr
 from google import genai
 from google.genai import types
 
-# Recupera la chiave API
+# Inizializzazione del client con la chiave API da Render
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
 
@@ -11,7 +11,7 @@ def rispondi(messaggio, cronologia):
     if cronologia is None:
         cronologia = []
 
-    # Formatta lo storico della chat per Gemini
+    # Formattazione dello storico per Gemini
     contents = []
     for user_msg, bot_msg in cronologia:
         contents.append(
@@ -31,9 +31,9 @@ def rispondi(messaggio, cronologia):
         )
     )
 
-    # Genera la risposta col modello Gemini 3.6 Flash
+    # Chiamata al modello ufficiale Gemini 2.5 Flash
     response = client.models.generate_content(
-        model="gemini-3.6-flash",
+        model="gemini-2.5-flash",
         contents=contents,
         config=types.GenerateContentConfig(
             system_instruction="Sei TONY, un assistente IA amichevole, brillante e utile."
@@ -46,24 +46,33 @@ def rispondi(messaggio, cronologia):
     return "", cronologia
 
 
-# Interfaccia Gradio multi-utente con memoria isolata
+def svuota_chat():
+    return [], []
+
+
+# Interfaccia Gradio multi-utente
 with gr.Blocks(theme=gr.themes.Soft()) as demo:
     gr.Markdown("<center><h1>TONY - Assistente Virtuale</h1></center>")
     gr.Markdown(
         "<center><h3>Anche se non sono intelligente come Lorenzo, proverò ad"
         " aiutarti!</h3></center>"
     )
-    
-    # Elemento visivo della chat (indispensabile prima dei comandi sottostanti)
+
+    # 1. Definizione dell'elemento Chatbot
     chatbot = gr.Chatbot(height=450)
+
+    # 2. Casella di testo e pulsante di reset
     msg = gr.Textbox(placeholder="Scrivi un messaggio a TONY...")
     clear = gr.Button("Cancella Chat")
 
-    # gr.State() garantisce che Beatrice e te abbiate due chat separate
+    # 3. Stato isolato per ciascun utente
     stato_chat = gr.State([])
 
+    # 4. Assegnazione degli eventi
     msg.submit(rispondi, [msg, stato_chat], [msg, chatbot])
-    clear.click(lambda: ([], []), inputs:None, outputs=[chatbot, stato_chat])
+    clear.click(svuota_chat, inputs=None, outputs=[chatbot, stato_chat])
 
-server_port = int(os.environ.get.("PORT",7860))
-demo.launch(server_name="0.0.0.0",server_port=server_port)
+# Avvio del server visibile all'esterno per Render
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 7860))
+    demo.launch(server_name="0.0.0.0", server_port=port)
