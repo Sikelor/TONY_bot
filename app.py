@@ -3,7 +3,7 @@ import gradio as gr
 from google import genai
 from google.genai import types
 
-# Recupera la chiave API
+# Inizializza il client prendendo la chiave API dalle variabili d'ambiente
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
 
@@ -11,24 +11,21 @@ def rispondi(messaggio, cronologia):
     if cronologia is None:
         cronologia = []
 
-    # Formatta lo storico dei messaggi per l'API di Gemini
+    # Costruisce lo storico per Gemini usando il formato tupla (user, bot)
     contents = []
-    for item in cronologia:
-        if isinstance(item, dict):
-            role = "user" if item.get("role") == "user" else "model"
-            content = item.get("content", "")
-        else:
-            role = "user"
-            content = item[0] if len(item) > 0 else ""
-
-        if content:
-            contents.append(
-                types.Content(
-                    role=role, parts=[types.Part.from_text(text=content)]
-                )
+    for user_msg, bot_msg in cronologia:
+        contents.append(
+            types.Content(
+                role="user", parts=[types.Part.from_text(text=str(user_msg))]
             )
+        )
+        contents.append(
+            types.Content(
+                role="model", parts=[types.Part.from_text(text=str(bot_msg))]
+            )
+        )
 
-    # Aggiunge l'ultimo messaggio dell'utente
+    # Aggiunge il messaggio corrente dell'utente
     contents.append(
         types.Content(
             role="user", parts=[types.Part.from_text(text=messaggio)]
@@ -46,9 +43,8 @@ def rispondi(messaggio, cronologia):
 
     testo_risposta = response.text
 
-    # Aggiorna la cronologia in formato compatibile (dizionario)
-    cronologia.append({"role": "user", "content": messaggio})
-    cronologia.append({"role": "assistant", "content": testo_risposta})
+    # Aggiorna la cronologia aggiungendo la nuova tupla (messaggio, risposta)
+    cronologia.append((messaggio, testo_risposta))
 
     return "", cronologia
 
@@ -57,7 +53,7 @@ def svuota_chat():
     return [], []
 
 
-# Interfaccia Gradio multi-utente
+# Interfaccia Gradio
 with gr.Blocks(theme=gr.themes.Soft()) as demo:
     gr.Markdown("<center><h1>TONY - Assistente Virtuale</h1></center>")
     gr.Markdown(
@@ -65,15 +61,14 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
         " aiutarti!</h3></center>"
     )
 
-    # Inizializzazione pulita senza argomenti non supportati
     chatbot = gr.Chatbot(height=450)
-
     msg = gr.Textbox(placeholder="Scrivi un messaggio a TONY...")
     clear = gr.Button("Cancella Chat")
 
     stato_chat = gr.State([])
 
-    msg.submit(rispondi, [msg, chatbot], [msg, chatbot])
+    # Collegamento corretto degli eventi con lo stato isolato
+    msg.submit(rispondi, [msg, stato_chat], [msg, chatbot])
     clear.click(svuota_chat, inputs=None, outputs=[chatbot, stato_chat])
 
 if __name__ == "__main__":
