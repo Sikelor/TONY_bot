@@ -63,7 +63,7 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
     stato_chat = gr.State([])
 
     msg.submit(rispondi, [msg, stato_chat], [msg, chatbot])
-    clear.click(lambda: ([], []), None, [chatbot, stato_chat])
+    clear.click(lambda: ([], []), inputs:None, outputs=[chatbot, stato_chat])
 
 server_port = int(os.environ.get.("PORT",7860))
 demo.launch(server_name="0.0.0.0",server_port=server_port)
