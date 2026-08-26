@@ -53,10 +53,9 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
         "<center><h3>Anche se non sono intelligente come Lorenzo, proverò ad"
         " aiutarti!</h3></center>"
     )
-
+    
     # Elemento visivo della chat (indispensabile prima dei comandi sottostanti)
     chatbot = gr.Chatbot(height=450)
-
     msg = gr.Textbox(placeholder="Scrivi un messaggio a TONY...")
     clear = gr.Button("Cancella Chat")
 
