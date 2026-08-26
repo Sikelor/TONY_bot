@@ -1,27 +1,62 @@
 import os
 import gradio as gr
 from google import genai
+from google.genai import types
 
-# Invece di scriverla in chiaro, la legge in modo sicuro dalle impostazioni di Render
-chiave = os.environ.get("GEMINI_API_KEY")
+# Recupera la chiave API
+client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
-client = genai.Client(api_key=chiave)
 
-def risposta_tony(messaggio, storia):
-    risposta = client.models.generate_content(
-        model="gemini-3.6-flash",
-        contents=messaggio,
-        config={"system_instruction": "Sei TONY, un assistente virtuale amichevole e ironico creato da Lorenzo."}
+def rispondi(messaggio, cronologia):
+    if cronologia is None:
+        cronologia = []
+
+    # Formattta lo storico della chat per Gemini
+    contents = []
+    for user_msg, bot_msg in cronologia:
+        contents.append(
+            types.Content(
+                role="user", parts=[types.Part.from_text(text=user_msg)]
+            )
+        )
+        contents.append(
+            types.Content(
+                role="model", parts=[types.Part.from_text(text=bot_msg)]
+            )
+        )
+
+    contents.append(
+        types.Content(
+            role="user", parts=[types.Part.from_text(text=messaggio)]
+        )
     )
-    return risposta.text
 
+    # Genera la risposta col modello Gemini 2.5 Flash
+    response = client.models.generate_content(
+        model="gemini-3.6-flash",
+        contents=contents,
+        config=types.GenerateContentConfig(
+            system_instruction="Sei TONY, un assistente IA amichevole, brillante e utile."
+        ),
+    )
+
+    testo_risposta = response.text
+    cronologia.append((messaggio, testo_risposta))
+
+    return "", cronologia
+
+
+# Interfaccia Gradio multi-utente con memoria isolata
 with gr.Blocks(theme=gr.themes.Soft()) as demo:
     gr.Markdown("<center><h1>TONY - Assistente Virtuale</h1></center>")
-    gr.Markdown("<center><h5>Anche se non sono intelligente come Lorenzo, proverò ad aiutarti!</h5></center>")
-    
-    chat = gr.ChatInterface(
-        fn=risposta_tony,
-        textbox=gr.Textbox(placeholder="Scrivi un messaggio a TONY...")
-    )
+    gr.Markdown("<center><h3>Anche se non sono intelligente come Lorenzo, proverò ad aiutarti!</h3></center>")
+    msg = gr.Textbox(placeholder="Scrivi un messaggio a TONY...")
+    clear = gr.Button("Cancella Chat")
 
-demo.launch(server_name="0.0.0.0", server_port=7860)
+    # gr.State() garantisce che Beatrice e te abbiate due chat separate
+    stato_chat = gr.State([])
+
+    msg.submit(rispondi, [msg, stato_chat], [msg, chatbot])
+    clear.click(lambda: ([], []), None, [chatbot, stato_chat])
+
+demo.launch()
