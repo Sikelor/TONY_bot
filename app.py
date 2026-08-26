@@ -11,24 +11,31 @@ def rispondi(messaggio, cronologia):
     if cronologia is None:
         cronologia = []
 
-    # Formatta lo storico per l'API di Gemini
+    # Formatta lo storico dei messaggi per l'API di Gemini
     contents = []
-    for msg in cronologia:
-        role = "user" if msg["role"] == "user" else "model"
-        contents.append(
-            types.Content(
-                role=role, parts=[types.Part.from_text(text=msg["content"])]
-            )
-        )
+    for item in cronologia:
+        if isinstance(item, dict):
+            role = "user" if item.get("role") == "user" else "model"
+            content = item.get("content", "")
+        else:
+            role = "user"
+            content = item[0] if len(item) > 0 else ""
 
-    # Aggiunge l'ultimo messaggio dell'utente per Gemini
+        if content:
+            contents.append(
+                types.Content(
+                    role=role, parts=[types.Part.from_text(text=content)]
+                )
+            )
+
+    # Aggiunge l'ultimo messaggio dell'utente
     contents.append(
         types.Content(
             role="user", parts=[types.Part.from_text(text=messaggio)]
         )
     )
 
-    # Chiamata a Gemini
+    # Chiamata al modello Gemini 2.5 Flash
     response = client.models.generate_content(
         model="gemini-2.5-flash",
         contents=contents,
@@ -39,7 +46,7 @@ def rispondi(messaggio, cronologia):
 
     testo_risposta = response.text
 
-    # Nuovo formato dizionario per le versioni recenti di Gradio
+    # Aggiorna la cronologia in formato compatibile (dizionario)
     cronologia.append({"role": "user", "content": messaggio})
     cronologia.append({"role": "assistant", "content": testo_risposta})
 
@@ -58,8 +65,8 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
         " aiutarti!</h3></center>"
     )
 
-    # type="messages" abilita il supporto al nuovo formato di Gradio
-    chatbot = gr.Chatbot(height=450, type="messages")
+    # Inizializzazione pulita senza argomenti non supportati
+    chatbot = gr.Chatbot(height=450)
 
     msg = gr.Textbox(placeholder="Scrivi un messaggio a TONY...")
     clear = gr.Button("Cancella Chat")
