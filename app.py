@@ -3,7 +3,7 @@ import gradio as gr
 from google import genai
 from google.genai import types
 
-# Inizializzazione del client con la chiave API da Render
+# Recupera la chiave API
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
 
@@ -11,29 +11,26 @@ def rispondi(messaggio, cronologia):
     if cronologia is None:
         cronologia = []
 
-    # Formattazione dello storico per Gemini
+    # Formatta lo storico per l'API di Gemini
     contents = []
-    for user_msg, bot_msg in cronologia:
+    for msg in cronologia:
+        role = "user" if msg["role"] == "user" else "model"
         contents.append(
             types.Content(
-                role="user", parts=[types.Part.from_text(text=user_msg)]
-            )
-        )
-        contents.append(
-            types.Content(
-                role="model", parts=[types.Part.from_text(text=bot_msg)]
+                role=role, parts=[types.Part.from_text(text=msg["content"])]
             )
         )
 
+    # Aggiunge l'ultimo messaggio dell'utente per Gemini
     contents.append(
         types.Content(
             role="user", parts=[types.Part.from_text(text=messaggio)]
         )
     )
 
-    # Chiamata al modello ufficiale Gemini 2.5 Flash
+    # Chiamata a Gemini
     response = client.models.generate_content(
-        model="gemini-3.6-flash",
+        model="gemini-2.5-flash",
         contents=contents,
         config=types.GenerateContentConfig(
             system_instruction="Sei TONY, un assistente IA amichevole, brillante e utile."
@@ -41,7 +38,10 @@ def rispondi(messaggio, cronologia):
     )
 
     testo_risposta = response.text
-    cronologia.append((messaggio, testo_risposta))
+
+    # Nuovo formato dizionario per le versioni recenti di Gradio
+    cronologia.append({"role": "user", "content": messaggio})
+    cronologia.append({"role": "assistant", "content": testo_risposta})
 
     return "", cronologia
 
@@ -58,21 +58,17 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
         " aiutarti!</h3></center>"
     )
 
-    # 1. Definizione dell'elemento Chatbot
-    chatbot = gr.Chatbot(height=450)
+    # type="messages" abilita il supporto al nuovo formato di Gradio
+    chatbot = gr.Chatbot(height=450, type="messages")
 
-    # 2. Casella di testo e pulsante di reset
     msg = gr.Textbox(placeholder="Scrivi un messaggio a TONY...")
     clear = gr.Button("Cancella Chat")
 
-    # 3. Stato isolato per ciascun utente
     stato_chat = gr.State([])
 
-    # 4. Assegnazione degli eventi
-    msg.submit(rispondi, [msg, stato_chat], [msg, chatbot])
+    msg.submit(rispondi, [msg, chatbot], [msg, chatbot])
     clear.click(svuota_chat, inputs=None, outputs=[chatbot, stato_chat])
 
-# Avvio del server visibile all'esterno per Render
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 7860))
     demo.launch(server_name="0.0.0.0", server_port=port)
